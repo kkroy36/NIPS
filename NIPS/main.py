@@ -28,7 +28,7 @@ def main():
     '''
     N = 10
     type = "avg"
-    domain = "pong"
+    domain = "tetris"
     tdGB = TD(FA="GB",domain=domain,N=N,type=type,loss="ls")
     #tdGBlad = TD(FA="GB",domain=domain,N=N,type=type,loss="lad")
     #tdGBhuber = TD(FA="GB",domain=domain,N=N,type=type,loss="huber")
@@ -38,7 +38,7 @@ def main():
     #writeToFile(tdGBhuber.BE,N,"huber"+str(N)+domain+".txt")
     #writeToFile(tdNN.BE,N,"Deep Network"+str(N)+domain+".txt")
     #writeToFile(tdLS.BE,N,"Least Squares"+str(N)+domain+".txt")
-    plt.ylim(ymin=-0.1,ymax=1)
+    plt.ylim(ymin=-0.1,ymax=0.1)
     #plt.plot(range(N),difference(tdGBhuber.BE,tdGBlad.BE),label="LAD",color='red',linewidth=3)
     #plt.plot(range(N),difference(tdGBhuber.BE,tdGB.BE),label="LS",color='green',linewidth=3)
     #plt.plot(range(N),difference(tdGBhuber.BE,tdLS.BE),label="Least Squares",color='green',linewidth=3)

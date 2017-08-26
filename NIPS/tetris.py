@@ -345,20 +345,12 @@ Press space to continue""" % self.score)
 
 class Tetris(object):
         '''class for Tetris simulator'''
-        
-        @staticmethod
-        def start(tetris_object):
-                '''returns start state'''
-                App = TetrisApp()
-                tetris_object.run = App
-                return (tetris_object)
                 
         def __init__(self):
                 '''class constructor'''
                 self.nstones = 0
-                self.shape_counts = []
-                self.run = None
-                self.start = Tetris.start(self)
+                self.shape_counts = [0 for i in range(7)]
+                self.run = TetrisApp()
                 self.actions = ['w','a','s','d']
 
         def takeAction(self,state,action):
@@ -427,7 +419,8 @@ class Tetris(object):
 
 	def factored(self,state):
                 '''returns factored state'''
-                return [state.nstones]+state.shape_counts
+                return [int(x) for x in state.split(",")]
+                #return [state.nstones]+state.shape_counts
 
         def __repr__(self):
                 '''outputs this on call to print'''

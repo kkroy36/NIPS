@@ -5,6 +5,7 @@ from Wumpus import Grid
 from BW import BW
 from traffic import TrafficSignal
 from pong import Pong
+from tetris import Tetris
 from random import randint
 from copy import deepcopy
 from Matrix import matrix
@@ -26,6 +27,8 @@ class TD(object):
             self.domObj = TrafficSignal()
         elif domain == "pong":
             self.domObj = Pong()
+        elif domain == "tetris":
+            self.domObj = Tetris()
         if FA == "LSReg":
             self.FA = LSReg()
         elif FA == "NN":
@@ -54,15 +57,17 @@ class TD(object):
             d = TrafficSignal()
         elif self.domain == "pong":
             d = Pong()
+        elif self.domain == "tetris":
+            d = Tetris()
         #elif wumpus
         sample = []
-        state = d.start
+        state = d
         actions = d.actions
         while True:
             if state == "winner" or state == "loser":
                 sample += [deepcopy(state)]
                 break
-            sample += [deepcopy(state)]
+            sample += [deepcopy(str(state))]
             action = actions[randint(0,len(actions)-1)]
             state = d.takeAction(state,action)
         return sample
