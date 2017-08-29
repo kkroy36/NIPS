@@ -3,6 +3,10 @@ from copy import deepcopy
 import itertools
 from subprocess import Popen
 from os import system,waitpid,listdir
+import matplotlib.pyplot as plt
+import numpy as np
+import matplotlib
+from math import log
 
 '''
 global structures defined at the top
@@ -189,37 +193,47 @@ def get_projected_values():
     '''
     call_process('java -jar BoostSRL-v1-0.jar -i -reg -test test -target value -model train/models')
 
-def get_Bellman_error(typ):
+def get_Bellman_error(typ,state_string_id_pairs):
     '''returns bellman error based on type
        max or avg
     '''
+    global Values
     BE = []
     results = []
+    old_values = deepcopy(Values)
     with open("test/results_value.db") as results_file:
         results = results_file.read().splitlines()
     for result in results:
-        BE.append(float(result.split("\t")[1]) - float(result.split("\t")[2]))
+        state_id_in_result = result.split("\t")[0].split('(')[1][:-1]
+        new_value_for_state = float(result.split("\t")[1])
+        for state_string_id_pair in state_string_id_pairs:
+            if state_id_in_result == state_string_id_pair[1]:
+                Values[state_string_id_pair[0]] = new_value_for_state
+    for key in Values:
+        BE.append(Values[key]-old_values[key])
     call_process('rm -rf train test')
     if typ == "max":
         return max(BE)
     elif typ == "avg":
         return sum(BE)/float(len(BE))
 
-def apply_projection_and_getBE(state_sequence,values,typ="max"):
+def apply_projection_and_getBE(state_sequence,typ="max"):
     '''returns values after projection
        using RFGB
     '''
     facts,pos = [],[]
     target = "value"
+    state_string_id_pair = []
     for state in state_sequence[:-1]:
         facts += get_facts(state[0])
         state_string = str(state[0])
         state_id = "s"+str(state[2])
-        pos += ["regressionExample("+target+"("+state_id+"),"+str(values[state_string])+")."]
+        state_string_id_pair.append((state_string,state_id))
+        pos += ["regressionExample("+target+"("+state_id+"),"+str(Values[state_string])+")."]
     write_rdn_files_for_regression_training_and_testing(facts,pos)
     train_regression_model()
     get_projected_values()
-    bellman_error = get_Bellman_error(typ)
+    bellman_error = get_Bellman_error(typ,state_string_id_pair)
     return bellman_error
 
 def get_RDN_facts_pos_neg(state_sequence,action_list):#,boxes_list,trucks_list),state_number,current_action=False)
@@ -271,8 +285,6 @@ def goal_state(state):
 def apply_bellman_operator(state_sequence):
     '''applies bellman update on the trajectory'''
     global Values
-    global Count
-    Values,Count = {},{}
     discount_factor = 0.95
     goal_state_value = 100
     goal_state_string = str(state_sequence[-1])
@@ -450,14 +462,26 @@ def perform_inference_and_choose(state,state_number,actions,random=False):
     remove_test_files()
     return (action,truck,box)
 
+def plot_BE(BEs):
+    '''plots the bellman errors'''
+    N = len(BEs)
+    plt.ylim(ymin=min(BEs)-1,ymax=max(BEs)+1)
+    plt.plot(range(N),BEs,label="GB",linewidth=3)
+    plt.xlabel("iterations")
+    plt.ylabel("Bellman error")
+    plt.title("logistics")
+    plt.legend()
+    plt.show()
+
 def main():
     state_number = 1
     pos_action  = []
     facts,pos,neg = [],[],[]
     max_tolerance = 20
     batch_size = 10
-    burn_in_time = 100
-    number_of_trajectories = 10
+    burn_in_time = 0
+    number_of_trajectories = burn_in_time+100
+    BEs = []
     for trajectory in range(number_of_trajectories):
         if "train" not in listdir(".") or "test" not in listdir("."):
             make_train_and_test_directory()
@@ -471,44 +495,9 @@ def main():
             state = state.take_action(random_action,random_truck,random_box)
         state_sequence.append(deepcopy(state))
         values = apply_bellman_operator(state_sequence)
-        bellman_error = apply_projection_and_getBE(state_sequence,values,typ="avg")
-        print "bellman error for trajectory "+str(trajectory)+": "+str(bellman_error)
-    '''
-    for trajectory in range(number_of_trajectories):
-        max_tolerance_reached = False
-        state = World(state_number)
-        state_sequence = []
-        while not goal_state(state):
-            state_copy = deepcopy(state)
-            if "models" not in listdir("train") or (trajectory+1) < burn_in_time:
-                action_specification = perform_inference_and_choose(state,state_number,actions,random=True)
-            else:
-                if len(state_sequence) > max_tolerance and not max_tolerance_reached:
-                    state_sequence = []
-                    max_tolerance_reached = True
-                if not max_tolerance_reached:
-                    action_specification = perform_inference_and_choose(state,state_number,actions)
-                else:
-                    action_specification = perform_inference_and_choose(state,state_number,actions,random=True)
-            random_action = action_specification[0]
-            random_truck = action_specification[1]
-            random_box = action_specification[2]
-            state_sequence.append((state_copy,random_action+","+str(random_truck)+","+str(random_box),state_copy.state_number,deepcopy(state_copy)))
-            state = state.take_action(random_action,random_truck,random_box)
-        state_sequence.append(deepcopy(state))
-        update_values(state_sequence)
-        facts_pos_neg = get_RDN_facts_pos_neg(state_sequence,actions)
-        facts += facts_pos_neg[0]
-        pos += facts_pos_neg[1]
-        neg += facts_pos_neg[2]
-        state_number += len(state_sequence)
-        if (trajectory+1)%batch_size == 0 and (trajectory+1) > burn_in_time:
-            write_facts(facts)
-            write_pos_neg(pos,neg)
-            facts,pos,neg = [],[],[]
-            call_process('rm -rf train/models')
-            call_process('java -jar BoostSRL-v1-0.jar -l -train train -target move,load,unload')
-            remove_files()
-    '''
+        if trajectory >= burn_in_time:
+            bellman_error = apply_projection_and_getBE(state_sequence,typ="avg")
+            BEs.append(abs(bellman_error))
+    plot_BE(BEs)
 
 main()
